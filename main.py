@@ -12,8 +12,6 @@ from tqdm import tqdm
 import tensorflow_probability as tfp
 
 
-
-
 mnist = tf.keras.datasets.mnist
 cifar10 = tf.keras.datasets.cifar10
 
@@ -42,12 +40,12 @@ class LotteryDense(Layer):
 
     def build(self, input_shape):
         shape = (input_shape[-1], self.units)
-        M_init = tf.constant_initializer(-1.)
+        M_init = tf.constant_initializer(1.)
 
 
-        self.W = self.add_weight('W', shape=shape, trainable=False, initializer='glorot_uniform')
+        self.W = self.add_weight('W', shape=shape, trainable=False, initializer=tf.keras.initializers.GlorotNormal())
         self.W_rec = self.W.numpy()
-        self.std = 2/(sum(shape))
+        self.std = np.sqrt(2/(sum(shape)))
       
         # bino = np.random.binomial(1, p=0.5, size=shape).astype(np.float32)
         # #print(bino)
@@ -114,17 +112,16 @@ class LotteryDense(Layer):
         return out
 
 
-
-
 layers = [
     InputLayer(input_shape=(28, 28, 1)),
     Flatten(),
     #Dense(300, activation='relu', trainable=False),
     #Dense(100, activation='relu', trainable=False),
     LotteryDense(300),
-    ReLU(),
+    LeakyReLU(),
+    Dropout(0.3),
     LotteryDense(100),
-    ReLU(),
+    LeakyReLU(),
     LotteryDense(10),
     Activation('softmax')
 ]
@@ -181,10 +178,10 @@ def test_step(images, labels):
     test_accuracy(labels, predictions)
 
 
-EPOCHS = 100
+EPOCHS = 200
 
 for epoch in range(EPOCHS):
-    if epoch==20:
+    if epoch==0:
         print('ttt')
         for i, l in enumerate(model.layers):
             if type(l) is LotteryDense:
