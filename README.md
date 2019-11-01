@@ -1,5 +1,6 @@
 # Lottery Ticket Subnetwork
 
+Implementation of some of the experiments in this: https://arxiv.org/pdf/1905.01067.pdf
 
 # Notes
 
@@ -11,3 +12,9 @@
 
 -Python 3
 
+
+# Reading
+
+https://arxiv.org/pdf/1803.03635.pdf
+
+https://arxiv.org/pdf/1905.01067.pdf
