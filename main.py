@@ -44,7 +44,20 @@ class LotteryDense(Layer):
         shape = (input_shape[-1], self.units)
         M_init = tf.constant_initializer(-1.)
 
+
         self.W = self.add_weight('W', shape=shape, trainable=False, initializer='glorot_uniform')
+        self.W_rec = self.W.numpy()
+        self.std = 2/(sum(shape))
+      
+        # bino = np.random.binomial(1, p=0.5, size=shape).astype(np.float32)
+        # #print(bino)
+
+        # bino *= 2*std
+        # bino -= std
+        
+        # #print(bino)
+        # self.W.assign(bino.astype(np.float32))
+
         #self.B = self
         self.M = self.add_weight('M', shape=shape, trainable=True, initializer=M_init)
 
@@ -58,30 +71,48 @@ class LotteryDense(Layer):
 
         return m
 
+    def to_signed_constant(self):
+        new_w = np.full(self.W.shape, -self.std, dtype=np.float32)*(self.W_rec<0)+np.full(self.W.shape, self.std, dtype=np.float32)*(self.W_rec>=0)
+        self.W.assign(new_w)
+
 
     def call(self, x, training=True, **kwargs):
         out = None
         if training:
             #m = tf.cast(tfp.distributions.Bernoulli(probs=tf.nn.sigmoid(self.M)).sample(), dtype=tf.float32)
-            m = tf.cast(tfp.distributions.Bernoulli(probs=tf.nn.sigmoid(self.M)).sample(), dtype=tf.float32)\
+            mask = tf.cast(tfp.distributions.Bernoulli(probs=tf.nn.sigmoid(self.M)).sample(), dtype=tf.float32)\
                 + tf.nn.sigmoid(self.M)\
                 - tf.stop_gradient(tf.nn.sigmoid(self.M)) # Trick to let gradients pass
             #m = tf.sigmoid(self.M)
-            true_w = tf.math.multiply(m, self.W)
+            true_w = tf.math.multiply(mask, self.W)
+
+            tot = np.prod(self.M.shape).astype(np.float32)
+            n_nonz = tf.math.count_nonzero(mask)
+            true_w *= tf.cast(tot/n_nonz, dtype=tf.float32) # Dynamic weight rescaling
+
 
             out = tf.keras.backend.dot(x, true_w)
+
+
         else:
             #r = tf.random.uniform(shape=self.M.shape, minval=0, maxval=1)
             #m = tf.math.greater(tf.sigmoid(self.M), r)
             #m = tf.dtypes.cast(m, tf.float32)
-            m = tf.cast(tfp.distributions.Bernoulli(probs=tf.nn.sigmoid(self.M)).sample(), dtype=tf.float32)
+            mask = tf.cast(tfp.distributions.Bernoulli(probs=tf.nn.sigmoid(self.M)).sample(), dtype=tf.float32)
 
             #print(tf.math.count_nonzero(m))
-
+            
             #m = np.random.binomial(1, tf.sigmoid(self.M), self.M.shape)
-            true_w = tf.math.multiply(m, self.W)
+            true_w = tf.math.multiply(mask, self.W)
+
+            tot = np.prod(self.M.shape).astype(np.float32)
+            n_nonz = tf.math.count_nonzero(mask)
+            true_w *= tf.cast(tot/n_nonz, dtype=tf.float32)
+
+
             out = tf.keras.backend.dot(x, true_w)
         return out
+
 
 
 
@@ -153,6 +184,11 @@ def test_step(images, labels):
 EPOCHS = 100
 
 for epoch in range(EPOCHS):
+    if epoch==20:
+        print('ttt')
+        for i, l in enumerate(model.layers):
+            if type(l) is LotteryDense:
+                l.to_signed_constant()
     st = time()
     for images, labels in train_ds:
         train_step(images, labels)
@@ -172,14 +208,6 @@ for epoch in range(EPOCHS):
 
     for test_images, test_labels in test_ds:
         test_step(test_images, test_labels)
-    '''
-    if epoch == 20:
-        mask = list(range(2, len(model.layers)-1))
-        mask = range(len(model.layers))
-        print(mask)
-        change_trainable(model, mask)
-        model.summary()
-    '''
 
     template = 'Epoch {}, Loss: {}, Accuracy: {}, Test Loss: {}, Test Accuracy: {}'
     print(template.format(epoch+1,
