@@ -63,9 +63,6 @@ test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='test_accuracy')
 def train_step(images, labels, optimizer, trainable_variables, reg=0, use_mask=True, inverse_mask=False):
     with tf.GradientTape() as tape:
         predictions = model(images, training=True, use_mask=use_mask, inverse_mask=inverse_mask)
-        #kl_loss = -0.5*tf.math.reduce_sum((1 + logvar - tf.square(mu) - tf.exp(logvar)))
-
-        #kl_loss = 0.00012*tf.reduce_mean(kl_loss)
 
         loss = loss_object(labels, predictions)
 
@@ -97,7 +94,7 @@ def test_step(images, labels):
 def get_all_masks(layers):
     masks = []
     for layer in layers:
-        if type(layer) in {LotteryDense, LotteryConv2D, TrainableDropout}:
+        if type(layer) in {LotteryDense, LotteryConv2D, TrainableDropout, TrainableChannelDropout}:
             masks.append(layer.M)
     return masks
 
@@ -113,7 +110,7 @@ def print_p_pruned(layers):
     tot_w = 0
     tot_m = 0
     for i, l in enumerate(layers):
-        if type(l) in{LotteryDense, LotteryConv2D, TrainableDropout}:
+        if type(l) in {LotteryDense, LotteryConv2D, TrainableDropout, TrainableChannelDropout}:
             tot = np.prod(l.M.shape)
             tot_w += tot
             mask = l.get_mask()
@@ -130,29 +127,51 @@ lott_t = True
 
 layers = [
     InputLayer(input_shape=(28, 28, 1)),
+
     # LotteryConv2D(32, 3, strides=2, trainable_kernel=lott_t),
-    # LeakyReLU(),
+    Conv2D(16, 3, strides=2),
+    LeakyReLU(),
+    TrainableChannelDropout(),
+
 
     # LotteryConv2D(64, 3, strides=2, trainable_kernel=lott_t),
-    # LeakyReLU(),
+    Conv2D(32, 3, strides=2),
+    LeakyReLU(),
+    TrainableChannelDropout(),
 
-    # LotteryConv2D(128, 3, strides=1, trainable_kernel=lott_t),
-    # LeakyReLU(),
+
+    # LotteryConv2D(128, 3, strides=2, trainable_kernel=lott_t),
+    Conv2D(64, 3, strides=2),
+    LeakyReLU(),
+    TrainableChannelDropout(),
+
 
     # LotteryConv2D(256, 3, strides=2, trainable_kernel=lott_t),
     # LeakyReLU(),
+    # TrainableChannelDropout(),
 
     Flatten(),
     # Dense(300, activation='relu', trainable=False),
     # LeakyReLU(),
     # Dense(100, activation='relu', trainable=False),
-    LotteryDense(300, trainable_kernel=lott_t),
-    LeakyReLU(),    
-    LotteryDense(100, trainable_kernel=lott_t),
-    LeakyReLU(),    
+    # LotteryDense(300, trainable_kernel=lott_t),
+    # LeakyReLU(),    
+    # LotteryDense(100, trainable_kernel=lott_t),
+    # LeakyReLU(),    
 
-    # Dropout(0.3),
-    LotteryDense(10, trainable_kernel=lott_t),
+    # # Dropout(0.3),
+    # LotteryDense(10, trainable_kernel=lott_t),
+    # TrainableDropout(),
+
+    # Dense(300),
+    # LeakyReLU(),
+    # TrainableDropout(),
+    # Dense(100),
+    # LeakyReLU(),
+    # TrainableDropout(),
+
+    Dense(10),
+
     Activation('softmax')
 ]
 
@@ -187,8 +206,8 @@ if __name__=='__main__':
 
 
         for i, (images1, labels1) in enumerate(tqdm(train_ds1)):
-            train_step(images1, labels1, kernel_optimizer, get_all_kernels(model.layers), inverse_mask=False) # DropConnect! http://yann.lecun.com/exdb/publis/pdf/wan-icml-13.pdf
-            train_step(images1, labels1, mask_optimizer, get_all_masks(model.layers))
+            #train_step(images1, labels1, kernel_optimizer, get_all_kernels(model.layers), use_mask=False) # DropConnect! http://yann.lecun.com/exdb/publis/pdf/wan-icml-13.pdf
+            train_step(images1, labels1, mask_optimizer, get_all_masks(model.layers), reg=5e-7)
             # if epoch<3:
             #     train_step(images1, labels1, mask_optimizer, model.trainable_variables, reg=True)
             # else:
