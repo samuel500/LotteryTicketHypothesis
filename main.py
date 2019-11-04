@@ -83,7 +83,7 @@ def train_step(images, labels, optimizer, trainable_variables, reg=0, use_mask=T
 
 #@tf.function
 def train_steps(images, labels, weight_optimizer, mask_optimizer, reg=0, use_mask=True, inverse_mask=False):
-    with tf.GradientTape() as weight_tape, tf.GradientTape as mask_tape:
+    with tf.GradientTape() as weight_tape, tf.GradientTape() as mask_tape:
         predictions = model(images, training=True, use_mask=use_mask, inverse_mask=inverse_mask)
 
         prediction_loss = cross_entropy(labels, predictions)
@@ -92,7 +92,7 @@ def train_steps(images, labels, weight_optimizer, mask_optimizer, reg=0, use_mas
             reg_loss = 0
             for layer in model.layers:
                 if type(layer) in {LotteryDense, LotteryConv2D, TrainableDropout, TrainableChannelDropout}:
-                    reg_loss += tf.reduce_sum(layer.M)
+                    reg_loss += tf.reduce_sum(layer.M) #???? U sure?
             reg_loss *= reg
         else:
             reg_loss = 0
@@ -107,7 +107,7 @@ def train_steps(images, labels, weight_optimizer, mask_optimizer, reg=0, use_mas
     mask_gradients = mask_tape.gradient(mask_loss, trainable_masks)
     mask_optimizer.apply_gradients(zip(mask_gradients, trainable_masks))
 
-    train_loss(loss)
+    train_loss(mask_loss)
     train_accuracy(labels, predictions)
 
 
@@ -162,8 +162,8 @@ def print_p_pruned(layers):
     print('Tot p pruned:', 1-tot_m/tot_w)
 
 
-lott_t = False
-kinic = True
+lott_t = True
+kinic = False
 
 layers = [
     InputLayer(input_shape=(28, 28, 1)),
@@ -198,7 +198,7 @@ layers = [
 
     Flatten(),
     # Dense(32),
-    LotteryDense(32, kernel_init_constant=kinic),
+    LotteryDense(32, kernel_init_constant=kinic, trainable_kernel=lott_t),
     # Dense(300, activation='relu', trainable=False),
     LeakyReLU(),
     # TrainableDropout(),
@@ -219,7 +219,7 @@ layers = [
     # LeakyReLU(),
     # TrainableDropout(),
 
-    LotteryDense(10, kernel_init_constant=kinic),
+    LotteryDense(10, kernel_init_constant=kinic, trainable_kernel=lott_t),
 
     Activation('softmax')
 ]
@@ -263,18 +263,20 @@ if __name__=='__main__':
         #     for i, l in enumerate(model.layers):
         #         if type(l) in {LotteryDense, LotteryConv2D}:
 
-        if not (epoch+1)%5:
-            for i, l in enumerate(model.layers):
-                if type(l) in {LotteryDense, LotteryConv2D}:
-                    l.resample_masked()
-                    mask = l.M.numpy()
-                    mask += 1.
-                    l.M.assign(mask)
-                    #l.reset_mask()
+        # if not (epoch+1)%5:
+        #     for i, l in enumerate(model.layers):
+        #         if type(l) in {LotteryDense, LotteryConv2D}:
+        #             l.resample_masked()
+        #             mask = l.M.numpy()
+        #             mask += 1.
+        #             l.M.assign(mask)
+        #             #l.reset_mask()
 
         for i, (images, labels) in enumerate(tqdm(train_ds)):
 
-            train_step(images, labels, mask_optimizer, get_all_masks(model.layers), reg=8e-7)
+            #train_step(images, labels, mask_optimizer, get_all_masks(model.layers), reg=8e-7)
+            train_steps(images, labels, kernel_optimizer, mask_optimizer, reg=1e-7)
+
             # if epoch<3:
             #     train_step(images1, labels1, mask_optimizer, model.trainable_variables, reg=True)
             # else:
