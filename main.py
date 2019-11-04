@@ -115,7 +115,7 @@ def train_steps(images, labels, weight_optimizer, mask_optimizer, reg=0, use_mas
 @tf.function
 def test_step(images, labels):
     predictions = model(images, training=False)
-    t_loss = loss_object(labels, predictions)
+    t_loss = cross_entropy(labels, predictions)
 
     test_loss(t_loss)
     test_accuracy(labels, predictions)
