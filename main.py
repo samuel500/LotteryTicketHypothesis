@@ -60,9 +60,9 @@ test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='test_accuracy')
 
 
 #@tf.function
-def train_step(images, labels, optimizer, trainable_variables, reg=False):
+def train_step(images, labels, optimizer, trainable_variables, reg=0, use_mask=True, inverse_mask=False):
     with tf.GradientTape() as tape:
-        predictions = model(images, training=True)
+        predictions = model(images, training=True, use_mask=use_mask, inverse_mask=inverse_mask)
         #kl_loss = -0.5*tf.math.reduce_sum((1 + logvar - tf.square(mu) - tf.exp(logvar)))
 
         #kl_loss = 0.00012*tf.reduce_mean(kl_loss)
@@ -74,7 +74,7 @@ def train_step(images, labels, optimizer, trainable_variables, reg=False):
             for layer in model.layers:
                 if type(layer) in {LotteryDense, LotteryConv2D}:
                     reg_loss += tf.reduce_sum(layer.M)
-            reg_loss *= 8e-7
+            reg_loss *= reg
             loss += reg_loss
 
     gradients = tape.gradient(loss, trainable_variables)
@@ -130,30 +130,34 @@ lott_t = True
 
 layers = [
     InputLayer(input_shape=(28, 28, 1)),
-    LotteryConv2D(32, 3, strides=2, trainable_kernel=lott_t),
-    LeakyReLU(),
+    # LotteryConv2D(32, 3, strides=2, trainable_kernel=lott_t),
+    # LeakyReLU(),
 
-    LotteryConv2D(64, 3, strides=2, trainable_kernel=lott_t),
-    LeakyReLU(),
+    # LotteryConv2D(64, 3, strides=2, trainable_kernel=lott_t),
+    # LeakyReLU(),
 
-    LotteryConv2D(128, 3, strides=1, trainable_kernel=lott_t),
-    LeakyReLU(),
+    # LotteryConv2D(128, 3, strides=1, trainable_kernel=lott_t),
+    # LeakyReLU(),
 
-    LotteryConv2D(256, 3, strides=2, trainable_kernel=lott_t),
-    LeakyReLU(),
+    # LotteryConv2D(256, 3, strides=2, trainable_kernel=lott_t),
+    # LeakyReLU(),
 
     Flatten(),
-    #Dense(300, activation='relu', trainable=False),
-    #Dense(100, activation='relu', trainable=False),
-    # LotteryDense(256),
+    # Dense(300, activation='relu', trainable=False),
     # LeakyReLU(),
+    # Dense(100, activation='relu', trainable=False),
+    LotteryDense(300, trainable_kernel=lott_t),
+    LeakyReLU(),    
+    LotteryDense(100, trainable_kernel=lott_t),
+    LeakyReLU(),    
+
     # Dropout(0.3),
     LotteryDense(10, trainable_kernel=lott_t),
     Activation('softmax')
 ]
 
 
-model = tf.keras.Sequential(
+model = LotteryModel(
     layers
 )
 
@@ -183,8 +187,8 @@ if __name__=='__main__':
 
 
         for i, (images1, labels1) in enumerate(tqdm(train_ds1)):
-            # train_step(images1, labels1, kernel_optimizer, get_all_kernels(model.layers)) # DropConnect! http://yann.lecun.com/exdb/publis/pdf/wan-icml-13.pdf
-            train_step(images1, labels1, mask_optimizer, get_all_masks(model.layers), reg=True)
+            train_step(images1, labels1, kernel_optimizer, get_all_kernels(model.layers), inverse_mask=False) # DropConnect! http://yann.lecun.com/exdb/publis/pdf/wan-icml-13.pdf
+            train_step(images1, labels1, mask_optimizer, get_all_masks(model.layers))
             # if epoch<3:
             #     train_step(images1, labels1, mask_optimizer, model.trainable_variables, reg=True)
             # else:

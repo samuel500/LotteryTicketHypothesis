@@ -12,7 +12,26 @@ import tensorflow_probability as tfp
 
 
 
-INIT_M = 5.
+INIT_M = 0.
+
+
+class LotteryModel(Model):
+
+    def __init__(self, layers, **kwargs):
+        super().__init__(**kwargs)
+        #self.inputs = layers[0]
+        self.seq_model = tf.keras.Sequential(layers)
+        self.layers_list = layers
+
+    def call(self, x, **kwargs):
+        for layer in self.layers_list:
+            if type(layer) in {LotteryDense, LotteryConv2D, TrainableDropout}: # Dropout, careful
+                x = layer(x, **kwargs)
+            else:
+                x = layer(x)
+        return x
+    def summary(self):
+        self.seq_model.summary()
 
 
 class LotteryDense(Layer):
@@ -49,21 +68,29 @@ class LotteryDense(Layer):
         self.W.assign(new_w)
 
 
-    def call(self, x, training=True, inverse_mask=False, **kwargs):
+    def call(self, x, training=True, use_mask=True, inverse_mask=False, **kwargs):
         out = None
+
         if training:
-            mask = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.M)).sample(), dtype=tf.float32)\
-                + tf.sigmoid(self.M)\
-                - tf.stop_gradient(tf.sigmoid(self.M)) # Trick to let gradients pass
-            # m = tf.sigmoid(self.M)
-            true_w = tf.math.multiply(mask, self.W)
-
-            tot = np.prod(self.M.shape).astype(np.float32)
-            n_nonz = tf.math.count_nonzero(mask)
-            true_w *= tf.cast(tot/n_nonz, dtype=tf.float32) # Dynamic weight rescaling
 
 
-            out = tf.keras.backend.dot(x, true_w)
+            if use_mask:
+                mask = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.M)).sample(), dtype=tf.float32)\
+                    + tf.sigmoid(self.M)\
+                    - tf.stop_gradient(tf.sigmoid(self.M)) # Trick to let gradients pass
+                # m = tf.sigmoid(self.M)
+                if not inverse_mask:
+                    true_w = tf.math.multiply(mask, self.W)
+                else:
+                    mask = 1-mask
+                    true_w = tf.math.multiply(mask, self.W)
+
+
+                tot = np.prod(self.M.shape).astype(np.float32)
+                n_nonz = tf.math.count_nonzero(mask)
+                true_w *= tf.cast(tot/n_nonz, dtype=tf.float32) # Dynamic weight rescaling
+
+                out = tf.keras.backend.dot(x, true_w)
 
 
         else:
