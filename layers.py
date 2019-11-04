@@ -216,7 +216,7 @@ class TrainableDropout(Layer):
 
         return out
 
-    def get_mask(self):
+    def get_int_mask(self):
         m = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.M)).sample(), dtype=tf.int32)
 
         return m
@@ -250,7 +250,7 @@ class TrainableChannelDropout(Layer):
 
         return out
 
-    def get_mask(self):
+    def get_int_mask(self):
         m = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.M)).sample(), dtype=tf.int32)
 
         return m
