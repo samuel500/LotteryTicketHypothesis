@@ -1,4 +1,6 @@
-# Lottery Ticket Subnetwork
+# Lottery Ticket Hypothesis
+
+Exploring the Lottery Ticket Hypothesis.
 
 Implementation of some of the experiments in this: https://arxiv.org/pdf/1905.01067.pdf
 
