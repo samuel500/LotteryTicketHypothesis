@@ -32,15 +32,15 @@ x_test = x_test[..., tf.newaxis]
 
 n_train = 30000
 #print('n:', n_train)
-x_train1 = x_train #[:n_train]
-y_train1 = y_train #[:n_train]
-x_train2 = x_train #[n_train:]
-y_train2 = y_train #[n_train:]
+# x_train1 = x_train #[:n_train]
+# y_train1 = y_train #[:n_train]
+# x_train2 = x_train #[n_train:]
+# y_train2 = y_train #[n_train:]
 
 
-train_ds1 = tf.data.Dataset.from_tensor_slices((x_train1, y_train1)).shuffle(10000).batch(128)
+train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(10000).batch(128)
 
-train_ds2 = tf.data.Dataset.from_tensor_slices((x_train2, y_train2)).shuffle(10000).batch(128)
+# train_ds2 = tf.data.Dataset.from_tensor_slices((x_train2, y_train2)).shuffle(10000).batch(128)
 
 
 test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(1024)
@@ -105,6 +105,14 @@ def get_all_kernels(layers):
             kernels.append(layer.W)
     return kernels
 
+def get_all_normals(layers):
+    normals = []
+    for layer in layers:
+        if type(layer) not in {LotteryConv2D, LotteryDense, TrainableDropout, TrainableChannelDropout}:
+            if layer.trainable_variables:
+                normals += layer.trainable_variables
+    return normals
+
 def print_p_pruned(layers):
 
     tot_w = 0
@@ -117,33 +125,34 @@ def print_p_pruned(layers):
             #print(mask)
             m = tf.math.count_nonzero(mask).numpy()
             tot_m += m
-            print('Layer', i, 'p pruned:', 1-m/tot)
+            print('Layer', i, '('+str(type(l))+')', 'p pruned:', 1-m/tot)
 
 
     print('Tot p pruned:', 1-tot_m/tot_w)
 
 
-lott_t = True
+lott_t = False
+kinic = True
 
 layers = [
     InputLayer(input_shape=(28, 28, 1)),
 
-    # LotteryConv2D(32, 3, strides=2, trainable_kernel=lott_t),
-    Conv2D(16, 3, strides=2),
+    LotteryConv2D(16, 3, strides=2, kernel_init_constant=kinic, trainable_kernel=lott_t),
+    # Conv2D(16, 3, strides=2),
     LeakyReLU(),
-    TrainableChannelDropout(),
+    #TrainableChannelDropout(),
 
 
-    # LotteryConv2D(64, 3, strides=2, trainable_kernel=lott_t),
-    Conv2D(32, 3, strides=2),
+    LotteryConv2D(32, 3, strides=2, kernel_init_constant=kinic, trainable_kernel=lott_t),
+    # Conv2D(32, 3, strides=2),
     LeakyReLU(),
-    TrainableChannelDropout(),
+    #TrainableChannelDropout(),
 
 
-    # LotteryConv2D(128, 3, strides=2, trainable_kernel=lott_t),
-    Conv2D(64, 3, strides=2),
+    LotteryConv2D(64, 3, strides=2, kernel_init_constant=kinic, trainable_kernel=lott_t),
+    #Conv2D(64, 3, strides=2),
     LeakyReLU(),
-    TrainableChannelDropout(),
+    #TrainableChannelDropout(),
 
 
     # LotteryConv2D(256, 3, strides=2, trainable_kernel=lott_t),
@@ -151,8 +160,11 @@ layers = [
     # TrainableChannelDropout(),
 
     Flatten(),
+    #Dense(32),
+    LotteryDense(32, kernel_init_constant=kinic),
     # Dense(300, activation='relu', trainable=False),
-    # LeakyReLU(),
+    LeakyReLU(),
+    #TrainableDropout(),
     # Dense(100, activation='relu', trainable=False),
     # LotteryDense(300, trainable_kernel=lott_t),
     # LeakyReLU(),    
@@ -170,7 +182,7 @@ layers = [
     # LeakyReLU(),
     # TrainableDropout(),
 
-    Dense(10),
+    LotteryDense(10, kernel_init_constant=kinic),
 
     Activation('softmax')
 ]
@@ -203,11 +215,21 @@ if __name__=='__main__':
         st = time()
 
         # if epoch < switch:
+        #     for i, (images, labels) in enumerate(tqdm(train_ds)):
+        #         train_step(images, labels, kernel_optimizer, get_all_normals(model.layers), use_mask=False) # DropConnect! http://yann.lecun.com/exdb/publis/pdf/wan-icml-13.pdf
+        #         train_step(images, labels, kernel_optimizer, model.trainable_variables)
 
+        # else:
+        # if epoch == switch:
+        #     print("Switch!")  
+        if epoch:
+            for i, l in enumerate(model.layers):
+                if type(l) is LotteryDense or type(l) is LotteryConv2D:
+                    l.resample_masked()
 
-        for i, (images1, labels1) in enumerate(tqdm(train_ds1)):
-            #train_step(images1, labels1, kernel_optimizer, get_all_kernels(model.layers), use_mask=False) # DropConnect! http://yann.lecun.com/exdb/publis/pdf/wan-icml-13.pdf
-            train_step(images1, labels1, mask_optimizer, get_all_masks(model.layers), reg=5e-7)
+        for i, (images, labels) in enumerate(tqdm(train_ds)):
+
+            train_step(images, labels, mask_optimizer, get_all_masks(model.layers), reg=2e-6)
             # if epoch<3:
             #     train_step(images1, labels1, mask_optimizer, model.trainable_variables, reg=True)
             # else:

@@ -40,6 +40,7 @@ class LotteryDense(Layer):
     def __init__(self, units, kernel_init_constant=False, trainable_kernel=False, **kwargs):
         self.units = units
         self.trainable_kernel = trainable_kernel 
+        self.kernel_init_constant = kernel_init_constant
         super(LotteryDense, self).__init__(**kwargs)
 
     def build(self, input_shape):
@@ -62,6 +63,19 @@ class LotteryDense(Layer):
         m = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.M)).sample(), dtype=tf.int32)
 
         return m
+
+    def resample_masked(self):
+        new_W_rec = tf.cast(tf.keras.initializers.GlorotNormal()(self.W.shape), dtype=tf.float32).numpy()
+        new_new_w = np.full(self.W.shape, -self.std, dtype=np.float32)*(new_W_rec<0)+np.full(self.W.shape, self.std, dtype=np.float32)*(new_W_rec>=0)
+        mask = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.M)).sample(), dtype=tf.float32)
+
+        new_new_w = self.W*mask+new_new_w*(1-mask)
+        self.W.assign(new_new_w)
+
+    def reset_mask(self):
+        M_init = tf.constant_initializer(INIT_M)
+        self.M.assign(M_init(self.M.shape))
+
 
     def to_signed_constant(self):
         # makes kernel weights either -std or +std
@@ -261,6 +275,20 @@ class LotteryConv2D(Layer):
     def to_signed_constant(self):
         new_w = np.full(self.W.shape, -self.std, dtype=np.float32)*(self.W_rec<0)+np.full(self.W.shape, self.std, dtype=np.float32)*(self.W_rec>=0)
         self.W.assign(new_w)
+
+    def resample_masked(self):
+        new_W_rec = tf.cast(tf.keras.initializers.GlorotNormal()(self.W.shape), dtype=tf.float32).numpy()
+        new_new_w = np.full(self.W.shape, -self.std, dtype=np.float32)*(new_W_rec<0)+np.full(self.W.shape, self.std, dtype=np.float32)*(new_W_rec>=0)
+
+        mask = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.M)).sample(), dtype=tf.float32)
+
+        new_new_w = self.W*mask+new_new_w*(1-mask)
+        self.W.assign(new_new_w)
+
+
+    def reset_mask(self):
+        M_init = tf.constant_initializer(INIT_M)
+        self.M.assign(M_init(self.M.shape))
 
     def get_mask(self):
         # r = tf.random.uniform(shape=self.M.shape, minval=0, maxval=1)
