@@ -30,7 +30,7 @@ x_train, x_test = x_train / 255.0, x_test / 255.0
 x_train = x_train[..., tf.newaxis]
 x_test = x_test[..., tf.newaxis]
 
-n_train = 30000
+# n_train = 30000
 #print('n:', n_train)
 # x_train1 = x_train #[:n_train]
 # y_train1 = y_train #[:n_train]
@@ -137,21 +137,27 @@ kinic = True
 layers = [
     InputLayer(input_shape=(28, 28, 1)),
 
+    TrainableDropout(),
     LotteryConv2D(16, 3, strides=2, kernel_init_constant=kinic, trainable_kernel=lott_t),
-    # Conv2D(16, 3, strides=2),
+    #Conv2D(16, 3, strides=2),
     LeakyReLU(),
+    # TrainableDropout(),
+
     #TrainableChannelDropout(),
 
 
     LotteryConv2D(32, 3, strides=2, kernel_init_constant=kinic, trainable_kernel=lott_t),
-    # Conv2D(32, 3, strides=2),
+    #Conv2D(32, 3, strides=2),
     LeakyReLU(),
+    # TrainableDropout(),
+
     #TrainableChannelDropout(),
 
 
     LotteryConv2D(64, 3, strides=2, kernel_init_constant=kinic, trainable_kernel=lott_t),
-    #Conv2D(64, 3, strides=2),
+    # Conv2D(64, 3, strides=2),
     LeakyReLU(),
+    # TrainableDropout(),
     #TrainableChannelDropout(),
 
 
@@ -160,11 +166,11 @@ layers = [
     # TrainableChannelDropout(),
 
     Flatten(),
-    #Dense(32),
+    # Dense(32),
     LotteryDense(32, kernel_init_constant=kinic),
     # Dense(300, activation='relu', trainable=False),
     LeakyReLU(),
-    #TrainableDropout(),
+    # TrainableDropout(),
     # Dense(100, activation='relu', trainable=False),
     # LotteryDense(300, trainable_kernel=lott_t),
     # LeakyReLU(),    
@@ -222,14 +228,22 @@ if __name__=='__main__':
         # else:
         # if epoch == switch:
         #     print("Switch!")  
-        if epoch:
+        # if epoch:
+        #     for i, l in enumerate(model.layers):
+        #         if type(l) in {LotteryDense, LotteryConv2D}:
+
+        if not (epoch+1)%5:
             for i, l in enumerate(model.layers):
-                if type(l) is LotteryDense or type(l) is LotteryConv2D:
+                if type(l) in {LotteryDense, LotteryConv2D}:
                     l.resample_masked()
+                    mask = l.M.numpy()
+                    mask += 1.
+                    l.M.assign(mask)
+                    #l.reset_mask()
 
         for i, (images, labels) in enumerate(tqdm(train_ds)):
 
-            train_step(images, labels, mask_optimizer, get_all_masks(model.layers), reg=2e-6)
+            train_step(images, labels, mask_optimizer, get_all_masks(model.layers), reg=8e-7)
             # if epoch<3:
             #     train_step(images1, labels1, mask_optimizer, model.trainable_variables, reg=True)
             # else:
