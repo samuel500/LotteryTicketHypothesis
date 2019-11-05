@@ -76,16 +76,19 @@ class LotteryLayer(Layer):
         M_init = tf.constant_initializer(INIT_M)
         self.M.assign(M_init(self.M.shape))
 
-    def get_mask(self, training):
+    def get_mask(self, training, inverse_mask=False, use_mask=True):
+        if not use_mask:
+            return None
+        mask = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.M)).sample(), dtype=tf.float32)
+        # mask = tf.sigmoid(self.M)
+        
+
+        if inverse_mask:
+            mask = 1-mask #? Before or after training?
+        
         if training:
-            # mask = tf.sigmoid(self.M)
-
-            mask = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.M)).sample(), dtype=tf.float32)\
-                        + tf.sigmoid(self.M)\
-                        - tf.stop_gradient(tf.sigmoid(self.M)) # Trick to let gradients pass
-        else:
-            mask = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.M)).sample(), dtype=tf.float32)
-
+            mask += tf.sigmoid(self.M) - tf.stop_gradient(tf.sigmoid(self.M)) # Trick to let gradients pass
+        
         return mask
 
 
@@ -121,25 +124,12 @@ class LotteryConv2D(LotteryLayer):
 
 
     def call(self, x, training=True, use_mask=True, inverse_mask=False, **kwargs):
-        mask = self.get_mask(training)
-
-        if training:
-            if use_mask:
-                if not inverse_mask:
-                    true_w = tf.math.multiply(mask, self.W)
-                else:
-                    mask = 1-mask
-                    true_w = tf.math.multiply(mask, self.W)
-
-
-                true_w *= self.get_rescaling_factor(mask)
-            else:
-                true_w = self.W
-
-        else:
+        mask = self.get_mask(training, inverse_mask, use_mask)
+        if use_mask:
             true_w = tf.math.multiply(mask, self.W)
-
             true_w *= self.get_rescaling_factor(mask)
+        else:
+            true_w = self.W
 
         out = tf.nn.conv2d(x, true_w, self.strides, self.padding)
 
@@ -161,29 +151,14 @@ class LotteryDense(LotteryLayer):
 
 
     def call(self, x, training=True, use_mask=True, inverse_mask=False, **kwargs):
-        out = None
-        mask = self.get_mask(training)
-        if training:
-            if use_mask:
-                if not inverse_mask:
-                    true_w = tf.math.multiply(mask, self.W)
-                else:
-                    mask = 1-mask
-                    true_w = tf.math.multiply(mask, self.W)
-
-                true_w *= self.get_rescaling_factor(mask)
-            else:
-                true_w = self.W
-        
-        else:
+        mask = self.get_mask(training, inverse_mask, use_mask)
+        if use_mask:
             true_w = tf.math.multiply(mask, self.W)
-
             true_w *= self.get_rescaling_factor(mask)
-
+        else:
+            true_w = self.W
         out = tf.keras.backend.dot(x, true_w)
         return out
-
-
 
 
 
