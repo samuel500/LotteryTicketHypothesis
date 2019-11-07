@@ -30,14 +30,14 @@ x_train, x_test = x_train / 255.0, x_test / 255.0
 x_train = x_train[..., tf.newaxis]
 x_test = x_test[..., tf.newaxis]
 
-n_train = 55000
+n_train = 30000
 print('n:', n_train)
 x_train1 = x_train[:n_train]
 y_train1 = y_train[:n_train]
-x_train2 = x_train[n_train:]
-y_train2 = y_train[n_train:]
+x_train2 = x_train #[n_train:]
+y_train2 = y_train #[n_train:]
 
-
+train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(10000).batch(128)
 train_ds1 = tf.data.Dataset.from_tensor_slices((x_train1, y_train1)).shuffle(10000).batch(128)
 train_ds2 = tf.data.Dataset.from_tensor_slices((x_train2, y_train2)).shuffle(10000).batch(128)
 
@@ -170,39 +170,41 @@ def print_p_pruned(layers):
 
     print('Tot p pruned:', 1-tot_m/tot_w)
 
+    return 1-tot_m/tot_w
 
-lott_t = True
-kinic = False
+
+lott_t = False
+kinic = True
 
 layers = [
     InputLayer(input_shape=(28, 28, 1)),
 
     # #TrainableDropout(),
-    LotteryConv2D(64, 3, strides=2, kernel_init_constant=kinic, trainable_kernel=lott_t),
-    #Conv2D(16, 3, strides=2),
-    LeakyReLU(),
-    # TrainableDropout(),
+    # LotteryConv2D(64, 3, strides=2, kernel_init_constant=kinic, trainable_kernel=lott_t),
+    # #Conv2D(16, 3, strides=2),
+    # LeakyReLU(),
+    # # TrainableDropout(),
 
-    #TrainableChannelDropout(),
-
-
-    LotteryConv2D(128, 3, strides=2, kernel_init_constant=kinic, trainable_kernel=lott_t),
-    #Conv2D(32, 3, strides=2),
-    LeakyReLU(),
-    # TrainableDropout(),
-
-    #TrainableChannelDropout(),
+    # #TrainableChannelDropout(),
 
 
-    LotteryConv2D(256, 3, strides=1, kernel_init_constant=kinic, trainable_kernel=lott_t),
-    # Conv2D(64, 3, strides=2),
-    LeakyReLU(),
-    # TrainableDropout(),
-    #TrainableChannelDropout(),
+    # LotteryConv2D(128, 3, strides=2, kernel_init_constant=kinic, trainable_kernel=lott_t),
+    # #Conv2D(32, 3, strides=2),
+    # LeakyReLU(),
+    # # TrainableDropout(),
+
+    # #TrainableChannelDropout(),
 
 
-    LotteryConv2D(256, 3, strides=1, trainable_kernel=lott_t),
-    LeakyReLU(),
+    # LotteryConv2D(256, 3, strides=1, kernel_init_constant=kinic, trainable_kernel=lott_t),
+    # # Conv2D(64, 3, strides=2),
+    # LeakyReLU(),
+    # # TrainableDropout(),
+    # #TrainableChannelDropout(),
+
+
+    # LotteryConv2D(256, 3, strides=1, trainable_kernel=lott_t),
+    # LeakyReLU(),
     # # TrainableChannelDropout(),
 
     Flatten(),
@@ -222,9 +224,10 @@ layers = [
     # LeakyReLU(),    
 
     # # Dropout(0.3),
-    LotteryDense(64, kernel_init_constant=kinic, trainable_kernel=lott_t),
-    LeakyReLU(),    
-
+    LotteryDense(300, kernel_init_constant=kinic, trainable_kernel=lott_t),
+    Maxout(),
+    LotteryDense(100, kernel_init_constant=kinic, trainable_kernel=lott_t),
+    Maxout(),    
     # TrainableDropout(),
 
     # Dense(300),
@@ -249,7 +252,7 @@ model.summary()
 
 
 if __name__=='__main__':
-    kernel_optimizer = tf.keras.optimizers.Adam()
+    kernel_optimizer = tf.keras.optimizers.Adam(3e-4)
     mask_optimizer = tf.keras.optimizers.SGD(100, momentum=0.9)
 
     switch = 40
@@ -257,6 +260,8 @@ if __name__=='__main__':
     EPOCHS = 500
 
     test_use_mask = True
+
+    all_masks = [] 
 
     for epoch in range(EPOCHS):
 
@@ -268,16 +273,18 @@ if __name__=='__main__':
 
         st = time()
 
-        if epoch < switch:
-            for i, (images1, labels1) in enumerate(tqdm(train_ds1)):
-                train_step(images1, labels1, kernel_optimizer, get_all_kernels(model.layers), use_mask=False) # DropConnect! http://yann.lecun.com/exdb/publis/pdf/wan-icml-13.pdf
-                #train_step(images, labels, kernel_optimizer, model.trainable_variables)
+        # if epoch < switch:
+        #     for i, (images1, labels1) in enumerate(tqdm(train_ds1)):
+        #         train_step(images1, labels1, mask_optimizer, get_all_masks(model.layers), reg=0.5e-7)
 
-        else:
-            if epoch == switch:
-                print("Switch!")  
-            for i, (images2, labels2) in enumerate(tqdm(train_ds1)):
-                train_step(images2, labels2, mask_optimizer, get_all_masks(model.layers))
+        #         #train_step(images, labels, kernel_optimizer, model.trainable_variables)
+
+        # else:
+        #     if epoch == switch:
+        #         print("Switch!")  
+        #     for i, (images2, labels2) in enumerate(tqdm(train_ds2)):
+        #         train_step(images2, labels2, kernel_optimizer, get_all_kernels(model.layers), use_mask=True) # DropConnect!? http://yann.lecun.com/exdb/publis/pdf/wan-icml-13.pdf
+
         # if epoch:
         #     for i, l in enumerate(model.layers):
         #         if type(l) in {LotteryDense, LotteryConv2D}:
@@ -291,11 +298,13 @@ if __name__=='__main__':
         #             l.M.assign(mask)
         #             #l.reset_mask()
 
-        # # for i, (images, labels) in enumerate(tqdm(train_ds)):
+        for i, (images, labels) in enumerate(tqdm(train_ds)):
 
         #     #masks_to_train = get_some_masks(model.layers, {TrainableDropout})
-        #     masks_to_train = get_all_masks(model.layers)
-        #     #train_step(images, labels, mask_optimizer, masks_to_train, reg=1e-7)
+            masks_to_train = get_all_masks(model.layers)
+            train_step(images, labels, mask_optimizer, masks_to_train, reg=5e-7)
+            train_step(images, labels, kernel_optimizer, get_all_normals(model.layers), use_mask=True)
+
 
         #     #train_steps(images, labels, kernel_optimizer, mask_optimizer, reg=1e-7, inverse_mask=True)
 
@@ -316,11 +325,37 @@ if __name__=='__main__':
 
         #         train_step(images2, labels2, mask_optimizer, get_all_masks(model.layers), reg=True)
 
-        print_p_pruned(model.layers)
+        totpp = print_p_pruned(model.layers)
+
+
+        if totpp > 0.5:
+            print("RESET")
+            new_mask_list = []
+            for i, l in enumerate(model.layers):
+                if type(l) in {LotteryDense, LotteryConv2D}:
+                    new_mask_list.append(l.get_int_mask().numpy())
+                    l.reset_mask()
+            all_masks.append(new_mask_list)
+
+            if len(all_masks) == 2:
+                print("EXPP")
+                tot_eq = 0
+                tot_np_p = 0
+                for i, mask in enumerate(all_masks[0]):
+                    print(i, 'shape:', mask.shape)
+
+                    eq = sum(sum(all_masks[0][i] == all_masks[1][i]))
+                    tot_eq += eq
+                    np_p = np.prod(mask.shape)
+                    tot_np_p += np_p
+                    print(i, 'p equal', eq/np_p)
+                print('tot p eq', tot_eq/tot_np_p)
 
         for test_images, test_labels in test_ds:
             test_step(test_images, test_labels, test_use_mask)
 
+
+        
 
 
         template = 'Epoch {}, Loss: {}, Accuracy: {}, Test Loss: {}, Test Accuracy: {}'
