@@ -92,8 +92,6 @@ class LotteryLayer(Layer):
         return mask
 
 
-
-
     def get_int_mask(self):
         # r = tf.random.uniform(shape=self.M.shape, minval=0, maxval=1)
         # m = tf.math.greater(tf.sigmoid(self.M), r)
@@ -139,6 +137,8 @@ class LotteryConv2D(LotteryLayer):
 
 
 
+
+
 class LotteryDense(LotteryLayer):
 
     def __init__(self, units, kernel_init_constant=False, trainable_kernel=False, **kwargs):
@@ -162,6 +162,39 @@ class LotteryDense(LotteryLayer):
         out = tf.keras.backend.dot(x, true_w)
         return out
 
+
+class BinaryDense(Layer):
+
+    def __init__(self, units, **kwargs):
+        self.units = units
+        super().__init__(**kwargs)
+
+    def build(self, input_shape):
+        shape = (input_shape[-1], self.units)
+        self.std = np.sqrt(2/(np.prod(shape[:-1])+shape[-1]))
+
+        M_init = tf.constant_initializer(0)
+
+        self.M = self.add_weight('M', shape=shape, trainable=True, initializer=M_init)
+        super().build(input_shape)
+
+
+    def call(self, x, training=True, **kwargs):
+        mask = self.get_weight(training)
+
+        out = tf.keras.backend.dot(x, mask)
+        return out
+
+    def get_weight(self, training):
+
+        mask = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.M)).sample(), dtype=tf.float32)
+        mask *= 2 
+        mask -= 1 
+        if training:
+            mask += tf.tanh(self.M) - tf.stop_gradient(tf.tanh(self.M)) # Trick to let gradients pass
+        
+        mask *= self.std
+        return mask
 
 
 class TrainableDropout(Layer):

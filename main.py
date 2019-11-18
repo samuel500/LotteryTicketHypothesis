@@ -111,7 +111,7 @@ def train_steps(images, labels, weight_optimizer, mask_optimizer, reg=0, use_mas
 
 
 
-@tf.function
+#@tf.function
 def test_step(images, labels, use_mask=True):
     predictions = model(images, training=False, use_mask=use_mask)
     t_loss = cross_entropy(labels, predictions)
@@ -124,7 +124,7 @@ def test_step(images, labels, use_mask=True):
 def get_all_masks(layers):
     masks = []
     for layer in layers:
-        if type(layer) in {LotteryDense, LotteryConv2D, TrainableDropout, TrainableChannelDropout}:
+        if type(layer) in {LotteryDense, LotteryConv2D, TrainableDropout, TrainableChannelDropout, BinaryDense}:
             masks.append(layer.M)
     return masks
 
@@ -224,10 +224,10 @@ layers = [
     # LeakyReLU(),    
 
     # # Dropout(0.3),
-    LotteryDense(300, kernel_init_constant=kinic, trainable_kernel=lott_t),
-    Maxout(),
-    LotteryDense(100, kernel_init_constant=kinic, trainable_kernel=lott_t),
-    Maxout(),    
+    # LotteryDense(300, kernel_init_constant=kinic, trainable_kernel=lott_t),
+    # Maxout(trainable_list=[True, False, False, False]),
+    # LotteryDense(100, kernel_init_constant=kinic, trainable_kernel=lott_t),
+    # Maxout(trainable_list=[True, False, False, False]),    
     # TrainableDropout(),
 
     # Dense(300),
@@ -237,7 +237,12 @@ layers = [
     # LeakyReLU(),
     # TrainableDropout(),
     #Dense(10),
-    LotteryDense(10, kernel_init_constant=kinic, trainable_kernel=lott_t),
+    # LotteryDense(10, kernel_init_constant=kinic, trainable_kernel=lott_t),
+    BinaryDense(300),
+    ReLU(),
+    BinaryDense(100),
+    ReLU(),
+    BinaryDense(10),
 
     Activation('softmax')
 ]
@@ -303,7 +308,7 @@ if __name__=='__main__':
         #     #masks_to_train = get_some_masks(model.layers, {TrainableDropout})
             masks_to_train = get_all_masks(model.layers)
             train_step(images, labels, mask_optimizer, masks_to_train, reg=5e-7)
-            train_step(images, labels, kernel_optimizer, get_all_normals(model.layers), use_mask=True)
+            #train_step(images, labels, kernel_optimizer, get_all_normals(model.layers), use_mask=True)
 
 
         #     #train_steps(images, labels, kernel_optimizer, mask_optimizer, reg=1e-7, inverse_mask=True)
@@ -325,31 +330,31 @@ if __name__=='__main__':
 
         #         train_step(images2, labels2, mask_optimizer, get_all_masks(model.layers), reg=True)
 
-        totpp = print_p_pruned(model.layers)
+        #totpp = print_p_pruned(model.layers)
 
 
-        if totpp > 0.5:
-            print("RESET")
-            new_mask_list = []
-            for i, l in enumerate(model.layers):
-                if type(l) in {LotteryDense, LotteryConv2D}:
-                    new_mask_list.append(l.get_int_mask().numpy())
-                    l.reset_mask()
-            all_masks.append(new_mask_list)
+        # if totpp > 0.5:
+        #     print("RESET")
+        #     new_mask_list = []
+        #     for i, l in enumerate(model.layers):
+        #         if type(l) in {LotteryDense, LotteryConv2D}:
+        #             new_mask_list.append(l.get_int_mask().numpy())
+        #             l.reset_mask()
+        #     all_masks.append(new_mask_list)
 
-            if len(all_masks) == 2:
-                print("EXPP")
-                tot_eq = 0
-                tot_np_p = 0
-                for i, mask in enumerate(all_masks[0]):
-                    print(i, 'shape:', mask.shape)
+        #     if len(all_masks) == 2:
+        #         print("EXPP")
+        #         tot_eq = 0
+        #         tot_np_p = 0
+        #         for i, mask in enumerate(all_masks[0]):
+        #             print(i, 'shape:', mask.shape)
 
-                    eq = sum(sum(all_masks[0][i] == all_masks[1][i]))
-                    tot_eq += eq
-                    np_p = np.prod(mask.shape)
-                    tot_np_p += np_p
-                    print(i, 'p equal', eq/np_p)
-                print('tot p eq', tot_eq/tot_np_p)
+        #             eq = sum(sum(all_masks[0][i] == all_masks[1][i]))
+        #             tot_eq += eq
+        #             np_p = np.prod(mask.shape)
+        #             tot_np_p += np_p
+        #             print(i, 'p equal', eq/np_p)
+        #         print('tot p eq', tot_eq/tot_np_p)
 
         for test_images, test_labels in test_ds:
             test_step(test_images, test_labels, test_use_mask)
