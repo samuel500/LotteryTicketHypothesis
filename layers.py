@@ -207,7 +207,7 @@ class BinaryLotteryDense(Layer):
     def build(self, input_shape):
         shape = (input_shape[-1], self.units)
         self.std = np.sqrt(2/(np.prod(shape[:-1])+shape[-1]))
-        M_init = tf.constant_initializer(5)
+        M_init = tf.constant_initializer(6)
         WM_init = tf.constant_initializer(0)
 
 
@@ -327,9 +327,6 @@ class TrainableChannelDropout(Layer):
         m = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.M)).sample(), dtype=tf.int32)
 
         return m
-
-
-
 
 
 

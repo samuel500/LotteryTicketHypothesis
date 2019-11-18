@@ -38,8 +38,8 @@ x_test = x_test[..., tf.newaxis]
 # y_train2 = y_train #[n_train:]
 
 train_ds = tf.data.Dataset.from_tensor_slices((x_train, y_train)).shuffle(10000).batch(128)
-train_ds1 = tf.data.Dataset.from_tensor_slices((x_train1, y_train1)).shuffle(10000).batch(128)
-train_ds2 = tf.data.Dataset.from_tensor_slices((x_train2, y_train2)).shuffle(10000).batch(128)
+# train_ds1 = tf.data.Dataset.from_tensor_slices((x_train1, y_train1)).shuffle(10000).batch(128)
+# train_ds2 = tf.data.Dataset.from_tensor_slices((x_train2, y_train2)).shuffle(10000).batch(128)
 
 
 test_ds = tf.data.Dataset.from_tensor_slices((x_test, y_test)).batch(1024)
@@ -216,7 +216,7 @@ if __name__=='__main__':
 
         for i, (images, labels) in enumerate(tqdm(train_ds)):
 
-            train_step(images, labels, mask_optimizer, model.trainable_variables, reg=1e-7)
+            train_step(images, labels, mask_optimizer, model.trainable_variables, reg=1e-8)
 
         totpp = print_p_pruned(model.layers)
 
