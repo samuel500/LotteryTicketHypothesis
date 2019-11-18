@@ -68,7 +68,7 @@ def train_step(images, labels, optimizer, trainable_variables, reg=0, use_mask=T
         if reg:
             reg_loss = 0
             for layer in model.layers:
-                if type(layer) in {LotteryDense, LotteryConv2D, TrainableDropout, TrainableChannelDropout}:
+                if type(layer) in {LotteryDense, LotteryConv2D, TrainableDropout, TrainableChannelDropout, BinaryLotteryDense}:
                     reg_loss += tf.reduce_sum(layer.M)
             reg_loss *= reg
             loss += reg_loss
@@ -158,7 +158,7 @@ def print_p_pruned(layers):
     tot_w = 0
     tot_m = 0
     for i, l in enumerate(layers):
-        if type(l) in {LotteryDense, LotteryConv2D, TrainableDropout, TrainableChannelDropout}:
+        if type(l) in {LotteryDense, LotteryConv2D, TrainableDropout, TrainableChannelDropout, BinaryLotteryDense}:
             tot = np.prod(l.M.shape)
             tot_w += tot
             mask = l.get_int_mask()
@@ -238,11 +238,11 @@ layers = [
     # TrainableDropout(),
     #Dense(10),
     # LotteryDense(10, kernel_init_constant=kinic, trainable_kernel=lott_t),
-    BinaryDense(300),
+    BinaryLotteryDense(300),
     ReLU(),
-    BinaryDense(100),
+    BinaryLotteryDense(100),
     ReLU(),
-    BinaryDense(10),
+    BinaryLotteryDense(10),
 
     Activation('softmax')
 ]
@@ -306,8 +306,8 @@ if __name__=='__main__':
         for i, (images, labels) in enumerate(tqdm(train_ds)):
 
         #     #masks_to_train = get_some_masks(model.layers, {TrainableDropout})
-            masks_to_train = get_all_masks(model.layers)
-            train_step(images, labels, mask_optimizer, masks_to_train, reg=5e-7)
+            #masks_to_train = get_all_masks(model.layers)
+            train_step(images, labels, mask_optimizer, model.trainable_variables, reg=5e-7)
             #train_step(images, labels, kernel_optimizer, get_all_normals(model.layers), use_mask=True)
 
 
@@ -330,7 +330,7 @@ if __name__=='__main__':
 
         #         train_step(images2, labels2, mask_optimizer, get_all_masks(model.layers), reg=True)
 
-        #totpp = print_p_pruned(model.layers)
+        totpp = print_p_pruned(model.layers)
 
 
         # if totpp > 0.5:

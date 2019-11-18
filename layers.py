@@ -191,11 +191,74 @@ class BinaryDense(Layer):
         mask *= 2 
         mask -= 1 
         if training:
-            mask += tf.tanh(self.M) - tf.stop_gradient(tf.tanh(self.M)) # Trick to let gradients pass
+            mask += 2*tf.sigmoid(self.M)-1 - tf.stop_gradient(2*tf.sigmoid(self.M)-1) # Trick to let gradients pass
         
         mask *= self.std
         return mask
 
+
+class BinaryLotteryDense(Layer):
+
+    def __init__(self, units, kernel_init_constant=False, trainable_kernel=False, **kwargs):
+        self.units = units
+        super().__init__(**kwargs)
+
+
+    def build(self, input_shape):
+        shape = (input_shape[-1], self.units)
+        self.std = np.sqrt(2/(np.prod(shape[:-1])+shape[-1]))
+        M_init = tf.constant_initializer(5)
+        WM_init = tf.constant_initializer(0)
+
+
+        self.WM = self.add_weight('WM', shape=shape, trainable=True, initializer=WM_init)
+        self.M = self.add_weight('M', shape=shape, trainable=True, initializer=M_init)
+
+        super().build(input_shape)
+
+
+    def call(self, x, training=True, **kwargs):
+
+        mask = self.get_mask(training)
+        weight = self.get_weight(training)
+
+        true_w = tf.math.multiply(mask, weight)
+        true_w *= self.get_rescaling_factor(mask)
+
+        out = tf.keras.backend.dot(x, true_w)
+        return out
+
+
+    def get_weight(self, training):
+
+        weight = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.WM)).sample(), dtype=tf.float32)
+        weight *= 2 
+        weight -= 1
+
+        if training:
+            weight += 2*tf.sigmoid(self.WM)-1 - tf.stop_gradient(2*tf.sigmoid(self.WM)-1) # Trick to let gradients pass
+        
+        weight *= self.std
+        return weight
+
+
+    def get_mask(self, training, inverse_mask=False, use_mask=True):
+
+        mask = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.M)).sample(), dtype=tf.float32)
+        
+        if training:
+            mask += tf.sigmoid(self.M) - tf.stop_gradient(tf.sigmoid(self.M)) # Trick to let gradients pass
+        
+        return mask
+
+    def get_rescaling_factor(self, mask):
+        tot = np.prod(self.M.shape).astype(np.float32)
+        n_nonz = tf.math.count_nonzero(mask)
+        return tf.cast(tot/n_nonz, dtype=tf.float32) # Dynamic weight rescaling
+
+    def get_int_mask(self):
+        m = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.M)).sample(), dtype=tf.int32)
+        return m
 
 class TrainableDropout(Layer):
 
