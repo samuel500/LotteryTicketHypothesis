@@ -4,6 +4,8 @@ Exploring the Lottery Ticket Hypothesis.
 
 Implementation of some of the experiments in this: https://arxiv.org/pdf/1905.01067.pdf
 
+Also includes trainable dropout mask layers and maxout layers.
+
 # Notes
 
 -TensorFlow 2.0.0
