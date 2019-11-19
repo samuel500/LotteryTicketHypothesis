@@ -158,7 +158,7 @@ def print_p_pruned(layers):
     tot_w = 0
     tot_m = 0
     for i, l in enumerate(layers):
-        if type(l) in {LotteryDense, LotteryConv2D, TrainableDropout, TrainableChannelDropout, BinaryLotteryDense}:
+        if type(l) in {LotteryDense, LotteryConv2D, TrainableDropout, TrainableChannelDropout, BinaryLotteryDense, BinaryLotteryConv2D}:
             tot = np.prod(l.M.shape)
             tot_w += tot
             mask = l.get_int_mask()
@@ -179,10 +179,16 @@ kinic = True
 layers = [
     InputLayer(input_shape=(28, 28, 1)),
 
-    Flatten(),
-    BinaryLotteryDense(300),
+    BinaryLotteryConv2D(16, kernel_size=4, strides=2),
     ReLU(),
-    BinaryLotteryDense(100),
+    BinaryLotteryConv2D(32, kernel_size=4, strides=1),
+    ReLU(),
+    BinaryLotteryConv2D(64, kernel_size=4, strides=2),
+    ReLU(),
+   
+
+    Flatten(),
+    BinaryLotteryDense(64),
     ReLU(),
     BinaryLotteryDense(10),
 
@@ -204,7 +210,7 @@ if __name__=='__main__':
 
     switch = 40
 
-    EPOCHS = 500
+    EPOCHS = 1000
 
     test_use_mask = True
 
@@ -216,7 +222,7 @@ if __name__=='__main__':
 
         for i, (images, labels) in enumerate(tqdm(train_ds)):
 
-            train_step(images, labels, mask_optimizer, model.trainable_variables, reg=1e-8)
+            train_step(images, labels, mask_optimizer, model.trainable_variables, reg=3e-8)
 
         totpp = print_p_pruned(model.layers)
 
