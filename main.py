@@ -15,6 +15,7 @@ from lottery_layers import *
 from maxout import *
 from trainable_dropout import *
 
+from layers_utils import *
 #tf.random.set_seed(8)
 
 
@@ -123,56 +124,25 @@ def test_step(images, labels, use_mask=True):
 
 
 
-def get_all_masks(layers):
-    masks = []
-    for layer in layers:
-        if type(layer) in {LotteryDense, LotteryConv2D, TrainableDropout, TrainableChannelDropout, BinaryDense}:
-            masks.append(layer.M)
-    return masks
 
-def get_all_kernels(layers):
-    kernels = []
-    for layer in layers:
-        if type(layer) in {LotteryConv2D, LotteryDense}:
-            kernels.append(layer.W)
-    return kernels
+class LotteryModel(Model):
 
+    def __init__(self, layers, **kwargs):
+        super().__init__(**kwargs)
+        #self.inputs = layers[0]
+        self.seq_model = tf.keras.Sequential(layers)
+        self.layers_list = layers
 
-def get_some_masks(layers, types):
-    masks = []
-    for layer in layers:
-        if type(layer) in types:
-            masks.append(layer.M)
-    return masks
+    def call(self, x, **kwargs):
+        for layer in self.layers_list:
+            if type(layer) in masked_layers: # careful
+                x = layer(x, **kwargs)
+            else:
+                x = layer(x)
+        return x
 
-
-def get_all_normals(layers):
-    normals = []
-    for layer in layers:
-        if type(layer) not in {LotteryConv2D, LotteryDense, TrainableDropout, TrainableChannelDropout}:
-            if layer.trainable_variables:
-                normals += layer.trainable_variables
-    return normals
-
-
-def print_p_pruned(layers):
-
-    tot_w = 0
-    tot_m = 0
-    for i, l in enumerate(layers):
-        if type(l) in {LotteryDense, LotteryConv2D, TrainableDropout, TrainableChannelDropout, BinaryLotteryDense, BinaryLotteryConv2D}:
-            tot = np.prod(l.M.shape)
-            tot_w += tot
-            mask = l.get_int_mask()
-            #print(mask)
-            m = tf.math.count_nonzero(mask).numpy()
-            tot_m += m
-            print('Layer', i, '('+str(type(l))+')', 'p pruned:', 1-m/tot)
-
-
-    print('Tot p pruned:', 1-tot_m/tot_w)
-
-    return 1-tot_m/tot_w
+    def summary(self):
+        self.seq_model.summary()
 
 
 lott_t = False

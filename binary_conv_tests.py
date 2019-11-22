@@ -16,6 +16,10 @@ from lottery_layers import *
 from maxout import *
 from trainable_dropout import *
 
+from layers_utils import *
+
+from pprint import pprint
+
 #tf.random.set_seed(8)
 
 mnist = tf.keras.datasets.mnist
@@ -48,17 +52,57 @@ test_accuracy = tf.keras.metrics.SparseCategoricalAccuracy(name='test_accuracy')
 
 
 #@tf.function
-def train_step(images, labels, optimizer, trainable_variables):
+def train_step(images, labels, optimizer, trainable_variables, reg=0, use_mask=True, inverse_mask=False):
     with tf.GradientTape() as tape:
-        predictions = model(images, training=True)
+        predictions = model(images, training=True, use_mask=use_mask, inverse_mask=inverse_mask)
 
         loss = cross_entropy(labels, predictions)
+
+        if reg:
+            reg_loss = 0
+            for layer in model.layers:
+                if type(layer) in {LotteryDense, LotteryConv2D, TrainableDropout, TrainableChannelDropout, BinaryLotteryDense}:
+                    reg_loss += tf.reduce_sum(layer.M)
+            reg_loss *= reg
+            loss += reg_loss
 
     gradients = tape.gradient(loss, trainable_variables)
     optimizer.apply_gradients(zip(gradients, trainable_variables))
 
     train_loss(loss)
     train_accuracy(labels, predictions)
+
+
+#@tf.function
+def train_steps(images, labels, kernel_optimizer, mask_optimizer, reg=0, use_mask=True, inverse_mask=False):
+    with tf.GradientTape() as weight_tape, tf.GradientTape() as mask_tape:
+        predictions = model(images, training=True, use_mask=use_mask, inverse_mask=inverse_mask)
+
+        prediction_loss = cross_entropy(labels, predictions)
+
+        if reg:
+            reg_loss = 0
+            for layer in model.layers:
+                if type(layer) in masked_layers:
+                    reg_loss += tf.reduce_sum(layer.M) #???? U sure?
+            reg_loss *= reg
+        else:
+            reg_loss = 0
+
+        mask_loss = prediction_loss + reg_loss
+        
+    trainable_weights = get_all_kernels(model.layers)+get_all_normals(model.layers)
+    kernel_gradients = weight_tape.gradient(prediction_loss, trainable_weights)
+    kernel_optimizer.apply_gradients(zip(kernel_gradients, trainable_weights))
+
+    trainable_masks = get_all_masks(model.layers)
+    mask_gradients = mask_tape.gradient(mask_loss, trainable_masks)
+    mask_optimizer.apply_gradients(zip(mask_gradients, trainable_masks))
+
+    train_loss(mask_loss)
+    train_accuracy(labels, predictions)
+
+
 
 
 
@@ -76,8 +120,7 @@ def test_step(images, labels, use_mask=True):
 layers = [
     InputLayer(input_shape=(28, 28, 1)),
 
-    BinaryLotteryConv2D(512, kernel_size=3, strides=2),
-    TrainableChannelDropout(),
+    BinaryLotteryConv2D(32, kernel_size=3, strides=2, trainable_M=False, const_init_M=20),
     ReLU(),
 
     Flatten(),
@@ -115,7 +158,7 @@ if __name__=='__main__':
 
         for i, (images, labels) in enumerate(tqdm(train_ds)):
 
-            train_step(images, labels, mask_optimizer, model.trainable_variables)
+            train_steps(images, labels, kernel_optimizer, mask_optimizer)
 
 
         for test_images, test_labels in test_ds:
@@ -134,6 +177,12 @@ if __name__=='__main__':
         train_accuracy.reset_states()
         test_loss.reset_states()
         test_accuracy.reset_states()
+
+
+        if epoch==10:
+            for layer in model.layers:
+                if type(layer) is BinaryLotteryConv2D:
+                    pprint(layer.get_weight(training=False, rescale=False))
 
         print('T:', time()-st)
 

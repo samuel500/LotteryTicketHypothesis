@@ -46,6 +46,11 @@ class BinaryDense(Layer):
         return mask
 
 
+
+# class BinaryLottery(Layer):
+    
+
+
 class BinaryLotteryDense(Layer):
 
     def __init__(self, units, kernel_init_constant=False, trainable_kernel=False, **kwargs):
@@ -59,9 +64,8 @@ class BinaryLotteryDense(Layer):
         M_init = tf.constant_initializer(5)
         WM_init = tf.constant_initializer(0)
 
-
-        self.WM = self.add_weight('WM', shape=shape, trainable=True, initializer=WM_init)
         self.M = self.add_weight('M', shape=shape, trainable=True, initializer=M_init)
+        self.WM = self.add_weight('WM', shape=shape, trainable=True, initializer=WM_init)
 
         super().build(input_shape)
 
@@ -110,27 +114,37 @@ class BinaryLotteryDense(Layer):
         return m
 
 
+
 class BinaryLotteryConv2D(Layer):
 
-    def __init__(self, filters, kernel_size, strides=1, padding='VALID', **kwargs):
+    def __init__(self, filters, kernel_size, strides=1, padding='VALID',
+                    trainable_WM=True, trainable_M=True, const_init_WM=0, const_init_M=5,
+                    **kwargs):
         
         self.filters = filters
         self.kernel_size = kernel_size
         self.strides = strides
         self.padding = padding
 
+        self.trainable_WM = trainable_WM
+        self.trainable_M = trainable_M
+
+        self.const_init_WM = const_init_WM
+        self.const_init_M = const_init_M
+
         super().__init__(**kwargs)
 
 
     def build(self, input_shape):
         shape = (self.kernel_size, self.kernel_size, input_shape[-1], self.filters)
+
         self.std = np.sqrt(2/(np.prod(shape[:-1])+shape[-1]))
-        M_init = tf.constant_initializer(10)
-        WM_init = tf.constant_initializer(0)
 
+        M_init = tf.constant_initializer(self.const_init_M)
+        WM_init = tf.constant_initializer(self.const_init_WM)
 
-        self.WM = self.add_weight('WM', shape=shape, trainable=True, initializer=WM_init)
-        self.M = self.add_weight('M', shape=shape, trainable=False, initializer=M_init)
+        self.M = self.add_weight('M', shape=shape, trainable=self.trainable_M, initializer=M_init)
+        self.WM = self.add_weight('WM', shape=shape, trainable=self.trainable_WM, initializer=WM_init)
 
         super().build(input_shape)
 
@@ -147,7 +161,7 @@ class BinaryLotteryConv2D(Layer):
         return out 
 
 
-    def get_weight(self, training):
+    def get_weight(self, training, rescale=True):
 
         weight = tf.cast(tfp.distributions.Bernoulli(probs=tf.sigmoid(self.WM)).sample(), dtype=tf.float32)
         weight *= 2 
@@ -155,8 +169,8 @@ class BinaryLotteryConv2D(Layer):
 
         if training:
             weight += 2*tf.sigmoid(self.WM)-1 - tf.stop_gradient(2*tf.sigmoid(self.WM)-1) # Trick to let gradients pass
-        
-        weight *= self.std
+        if rescale:
+            weight *= self.std
         return weight
 
 
