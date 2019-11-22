@@ -10,8 +10,10 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import tensorflow_probability as tfp
 
-from layers import *
-
+from binary_layers import *
+from lottery_layers import *
+from maxout import *
+from trainable_dropout import *
 
 #tf.random.set_seed(8)
 
@@ -222,7 +224,7 @@ if __name__=='__main__':
 
         for i, (images, labels) in enumerate(tqdm(train_ds)):
 
-            train_step(images, labels, mask_optimizer, model.trainable_variables, reg=3e-8)
+            train_step(images, labels, mask_optimizer, model.trainable_variables, reg=1e-7)
 
         totpp = print_p_pruned(model.layers)
 
