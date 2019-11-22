@@ -124,27 +124,6 @@ def test_step(images, labels, use_mask=True):
 
 
 
-
-class LotteryModel(Model):
-
-    def __init__(self, layers, **kwargs):
-        super().__init__(**kwargs)
-        #self.inputs = layers[0]
-        self.seq_model = tf.keras.Sequential(layers)
-        self.layers_list = layers
-
-    def call(self, x, **kwargs):
-        for layer in self.layers_list:
-            if type(layer) in masked_layers: # careful
-                x = layer(x, **kwargs)
-            else:
-                x = layer(x)
-        return x
-
-    def summary(self):
-        self.seq_model.summary()
-
-
 lott_t = False
 kinic = True
 

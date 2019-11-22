@@ -169,6 +169,8 @@ class BinaryLotteryConv2D(Layer):
 
         if training:
             weight += 2*tf.sigmoid(self.WM)-1 - tf.stop_gradient(2*tf.sigmoid(self.WM)-1) # Trick to let gradients pass
+            #weight += tf.sigmoid(self.WM) - tf.stop_gradient(tf.sigmoid(self.WM)) # Trick to let gradients pass
+
         if rescale:
             weight *= self.std
         return weight

@@ -115,18 +115,36 @@ def test_step(images, labels, use_mask=True):
     test_accuracy(labels, predictions)
 
 
+def visualize_kernels(kernels):
+
+    kd = 3
+    n = 4
+
+    fig=plt.figure(figsize=(8, 8))
+
+    for i in range(n**2):
+        img = kernels[...,i][...,0]
+        fig.add_subplot(n, n, i)
+        print(img.shape)
+        plt.imshow(img, origin="upper", cmap='gray')
+    plt.show()
+
+
 
 
 layers = [
     InputLayer(input_shape=(28, 28, 1)),
 
-    BinaryLotteryConv2D(32, kernel_size=3, strides=2, trainable_M=False, const_init_M=20),
+    BinaryLotteryConv2D(16, kernel_size=3, strides=2, trainable_M=False, const_init_M=20),
     ReLU(),
+    
+    #BinaryLotteryConv2D(16, kernel_size=3, strides=2, trainable_M=False, const_init_M=20),
+    #ReLU(),
 
     Flatten(),
-    Dense(32),
+    Dense(16, trainable=True),
     ReLU(),
-    Dense(10),
+    Dense(10, trainable=False),
 
     Activation('softmax')
 ]
@@ -139,12 +157,20 @@ model = LotteryModel(
 model.summary()
 
 
+def kernel_print(weights):
+
+    print(weights.shape)
+    _, _, _, C = weights.shape
+
+    for c in range(C):
+        pprint(weights[...,c])
+
 
 if __name__=='__main__':
 
 
     kernel_optimizer = tf.keras.optimizers.Adam(3e-4)
-    mask_optimizer = tf.keras.optimizers.SGD(100, momentum=0.9)
+    mask_optimizer = tf.keras.optimizers.SGD(150, momentum=0.9)
 
 
     EPOCHS = 1000
@@ -179,10 +205,13 @@ if __name__=='__main__':
         test_accuracy.reset_states()
 
 
-        if epoch==10:
+        if epoch==20:
             for layer in model.layers:
                 if type(layer) is BinaryLotteryConv2D:
-                    pprint(layer.get_weight(training=False, rescale=False))
+                    weight = layer.get_weight(training=False, rescale=False).numpy()
+                    #kernel_print(weight)
+                    visualize_kernels(weight)
+
 
         print('T:', time()-st)
 
