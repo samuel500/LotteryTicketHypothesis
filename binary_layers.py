@@ -53,19 +53,31 @@ class BinaryDense(Layer):
 
 class BinaryLotteryDense(Layer):
 
-    def __init__(self, units, kernel_init_constant=False, trainable_kernel=False, **kwargs):
+    def __init__(self, units, kernel_init_constant=False, trainable_kernel=False,
+                trainable_WM=True, trainable_M=True, const_init_WM=0, const_init_M=5,
+                 **kwargs):
         self.units = units
+
+
+        self.trainable_WM = trainable_WM
+        self.trainable_M = trainable_M
+
+        self.const_init_WM = const_init_WM
+        self.const_init_M = const_init_M
+
         super().__init__(**kwargs)
 
 
     def build(self, input_shape):
         shape = (input_shape[-1], self.units)
         self.std = np.sqrt(2/(np.prod(shape[:-1])+shape[-1]))
-        M_init = tf.constant_initializer(5)
-        WM_init = tf.constant_initializer(0)
 
-        self.M = self.add_weight('M', shape=shape, trainable=True, initializer=M_init)
-        self.WM = self.add_weight('WM', shape=shape, trainable=True, initializer=WM_init)
+        M_init = tf.constant_initializer(self.const_init_M)
+        WM_init = tf.constant_initializer(self.const_init_WM)
+
+        self.M = self.add_weight('M', shape=shape, trainable=self.trainable_M, initializer=M_init)
+        self.WM = self.add_weight('WM', shape=shape, trainable=self.trainable_WM, initializer=WM_init)
+
 
         super().build(input_shape)
 

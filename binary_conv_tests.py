@@ -115,19 +115,7 @@ def test_step(images, labels, use_mask=True):
     test_accuracy(labels, predictions)
 
 
-def visualize_kernels(kernels):
 
-    kd = 3
-    n = 4
-
-    fig=plt.figure(figsize=(8, 8))
-
-    for i in range(n**2):
-        img = kernels[...,i][...,0]
-        fig.add_subplot(n, n, i)
-        print(img.shape)
-        plt.imshow(img, origin="upper", cmap='gray')
-    plt.show()
 
 
 
@@ -135,16 +123,16 @@ def visualize_kernels(kernels):
 layers = [
     InputLayer(input_shape=(28, 28, 1)),
 
-    BinaryLotteryConv2D(16, kernel_size=3, strides=2, trainable_M=False, const_init_M=20),
+    BinaryLotteryConv2D(9, kernel_size=3, strides=2, trainable_M=True, const_init_M=20),
     ReLU(),
     
     #BinaryLotteryConv2D(16, kernel_size=3, strides=2, trainable_M=False, const_init_M=20),
     #ReLU(),
 
     Flatten(),
-    Dense(16, trainable=True),
+    Dense(32),
     ReLU(),
-    Dense(10, trainable=False),
+    Dense(10),
 
     Activation('softmax')
 ]
@@ -157,9 +145,24 @@ model = LotteryModel(
 model.summary()
 
 
+def visualize_kernels(kernels):
+
+    kd = 3
+    n = 3
+
+    fig=plt.figure(figsize=(10, 10))
+
+    for i in range(n**2):
+        img = kernels[...,i][...,0]
+        fig.add_subplot(n, n, i+1)
+        # print(img.shape)
+        plt.imshow(img, origin="upper", cmap='gray')
+    plt.show()
+
+
 def kernel_print(weights):
 
-    print(weights.shape)
+    # print(weights.shape)
     _, _, _, C = weights.shape
 
     for c in range(C):
@@ -184,7 +187,7 @@ if __name__=='__main__':
 
         for i, (images, labels) in enumerate(tqdm(train_ds)):
 
-            train_steps(images, labels, kernel_optimizer, mask_optimizer)
+            train_steps(images, labels, kernel_optimizer, mask_optimizer, reg=0)
 
 
         for test_images, test_labels in test_ds:
@@ -205,12 +208,14 @@ if __name__=='__main__':
         test_accuracy.reset_states()
 
 
-        if epoch==20:
+        if (epoch)%20==0:
             for layer in model.layers:
                 if type(layer) is BinaryLotteryConv2D:
                     weight = layer.get_weight(training=False, rescale=False).numpy()
+                    mask = layer.get_mask(training=False)
                     #kernel_print(weight)
-                    visualize_kernels(weight)
+                    kernels = mask*weight
+                    visualize_kernels(kernels)
 
 
         print('T:', time()-st)
