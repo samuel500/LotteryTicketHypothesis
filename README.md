@@ -22,3 +22,10 @@ Also includes trainable dropout mask layers and maxout layers.
 https://arxiv.org/pdf/1803.03635.pdf
 
 https://arxiv.org/pdf/1905.01067.pdf
+
+https://arxiv.org/pdf/1602.02830.pdf
+
+https://arxiv.org/pdf/1302.4389.pdf
+
+http://yann.lecun.com/exdb/publis/pdf/wan-icml-13.pdf
+

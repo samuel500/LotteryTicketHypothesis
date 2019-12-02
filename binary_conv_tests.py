@@ -123,9 +123,10 @@ def test_step(images, labels, use_mask=True):
 layers = [
     InputLayer(input_shape=(28, 28, 1)),
 
-    BinaryLotteryConv2D(9, kernel_size=3, strides=2, trainable_M=True, const_init_M=20),
+    BinaryLotteryConv2D(16, kernel_size=3, strides=2, trainable_M=False, const_init_M=20),
     ReLU(),
-    
+    Conv2D(32, kernel_size=4, strides=2),
+    ReLU(),
     #BinaryLotteryConv2D(16, kernel_size=3, strides=2, trainable_M=False, const_init_M=20),
     #ReLU(),
 
@@ -148,7 +149,7 @@ model.summary()
 def visualize_kernels(kernels):
 
     kd = 3
-    n = 3
+    n = 4
 
     fig=plt.figure(figsize=(10, 10))
 
@@ -208,7 +209,7 @@ if __name__=='__main__':
         test_accuracy.reset_states()
 
 
-        if (epoch)%20==0:
+        if (epoch)%10==0:
             for layer in model.layers:
                 if type(layer) is BinaryLotteryConv2D:
                     weight = layer.get_weight(training=False, rescale=False).numpy()
