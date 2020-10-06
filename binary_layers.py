@@ -54,7 +54,7 @@ class BinaryDense(Layer):
 class BinaryLotteryDense(Layer):
 
     def __init__(self, units, kernel_init_constant=False, trainable_kernel=False,
-                trainable_WM=True, trainable_M=True, const_init_WM=0, const_init_M=5,
+                trainable_WM=True, trainable_M=True, const_init_WM=0, const_init_M=3,
                  **kwargs):
         self.units = units
 
@@ -130,7 +130,7 @@ class BinaryLotteryDense(Layer):
 class BinaryLotteryConv2D(Layer):
 
     def __init__(self, filters, kernel_size, strides=1, padding='VALID',
-                    trainable_WM=True, trainable_M=True, const_init_WM=0, const_init_M=5,
+                    trainable_WM=True, trainable_M=True, const_init_WM=0, const_init_M=3,
                     **kwargs):
         
         self.filters = filters

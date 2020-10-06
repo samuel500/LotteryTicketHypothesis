@@ -11,7 +11,7 @@ from tqdm import tqdm
 import tensorflow_probability as tfp
 
 
-INIT_M = 2.
+INIT_M = 3.
 
 
 
